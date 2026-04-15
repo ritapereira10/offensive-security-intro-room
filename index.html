@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Offensive Security Intro — FakeBank</title>
+<style>
+:root {
+  --bg:       #12131f;
+  --panel:    #1a1b2c;
+  --surface:  #21223a;
+  --border:   #2e2f4a;
+  --red:      #e05252;
+  --blue:     #4a90e2;
+  --green:    #3ddc84;
+  --yellow:   #f5c542;
+  --text:     #c5c6d8;
+  --dim:      #666880;
+  --white:    #eeeef5;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex;flex-direction:column}
+
+/* ── Progress ── */
+.topbar{background:#0d0e1a;padding:7px 16px;display:flex;align-items:center;gap:12px;font-size:12px;color:var(--dim);border-bottom:1px solid var(--border);flex-shrink:0}
+.pbar{flex:1;height:5px;background:var(--border);border-radius:3px}
+.pfill{height:100%;background:linear-gradient(90deg,var(--blue),var(--green));border-radius:3px;transition:width .6s cubic-bezier(.4,0,.2,1)}
+
+/* ── Layout ── */
+.main{display:flex;flex:1;overflow:hidden}
+.task-panel{width:50%;overflow-y:auto;border-right:1px solid var(--border);background:var(--panel)}
+.env-panel{width:50%;background:var(--bg);display:flex;flex-direction:column;overflow:hidden}
+
+/* ── Tasks ── */
+.task{border-bottom:1px solid var(--border)}
+.task-header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;cursor:pointer;user-select:none;transition:background .15s}
+.task-header:hover{background:var(--surface)}
+.task.active>.task-header{border-left:3px solid var(--red);background:var(--surface)}
+.task-left{display:flex;align-items:center;gap:10px}
+.task-num{color:var(--red);font-weight:700;font-size:13px;min-width:50px}
+.task-dot{width:15px;height:15px;border:2px solid var(--border);border-radius:50%;flex-shrink:0;transition:all .3s}
+.task-dot.done{border-color:var(--green);background:var(--green);box-shadow:0 0 8px var(--green)}
+.task-title{font-size:14px;color:var(--white)}
+.chevron{color:var(--dim);font-size:11px;transition:transform .2s}
+.chevron.open{transform:rotate(180deg)}
+
+.task-body{display:none;padding:0 20px 20px;border-left:3px solid var(--red);background:var(--surface)}
+.task-body.open{display:block}
+
+/* ── Task body content ── */
+.hook{font-size:15px;color:var(--white);font-weight:600;line-height:1.5;margin:14px 0 10px}
+.sub{font-size:13px;color:var(--text);line-height:1.6;margin-bottom:14px}
+
+/* Diagrams */
+.diagram{margin:14px 0;display:flex;align-items:center;gap:0;overflow-x:auto}
+.phase-node{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:4px}
+.phase-circle{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;border:2px solid}
+.phase-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.phase-sub{font-size:10px;color:var(--dim)}
+.phase-arrow{color:var(--border);font-size:18px;margin:0 6px;flex-shrink:0;padding-bottom:14px}
+
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+.compare-card{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px}
+.compare-card h4{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.compare-card ul{list-style:none;font-size:12px;color:var(--text);line-height:1.9}
+.compare-card ul li::before{content:'▸ ';color:var(--dim)}
+
+.tool-cards{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+.tool-card{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center}
+.tool-card .tool-icon{font-size:28px;margin-bottom:6px}
+.tool-card h4{font-size:13px;font-weight:700;color:var(--white);margin-bottom:4px}
+.tool-card p{font-size:11px;color:var(--dim);line-height:1.5}
+.tool-card .tool-badge{display:inline-block;margin-top:8px;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;font-family:monospace}
+
+.owasp-card{background:var(--bg);border:1px solid var(--red);border-radius:8px;padding:14px;margin:12px 0;display:flex;gap:12px;align-items:flex-start}
+.owasp-icon{font-size:32px;flex-shrink:0}
+.owasp-title{font-size:13px;font-weight:700;color:var(--red);margin-bottom:4px}
+.owasp-desc{font-size:12px;color:var(--text);line-height:1.5}
+
+.report-anatomy{display:flex;align-items:center;gap:0;margin:12px 0;flex-wrap:wrap}
+.ra-step{display:flex;flex-direction:column;align-items:center;gap:3px;flex:1;min-width:52px}
+.ra-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px}
+.ra-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;text-align:center;color:var(--dim)}
+.ra-arrow{color:var(--border);font-size:14px;padding-bottom:12px;flex-shrink:0}
+
+/* ── Questions ── */
+.q-section{margin-top:16px;padding-top:14px;border-top:1px solid var(--border)}
+.q-label{font-size:11px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+.q-text{font-size:13px;color:var(--text);margin-bottom:10px;line-height:1.5}
+.q-row{display:flex;gap:7px;align-items:center}
+.q-input{flex:1;background:var(--bg);border:1px solid var(--border);color:var(--white);padding:9px 12px;border-radius:6px;font-size:13px;outline:none;transition:border .2s}
+.q-input:focus{border-color:var(--blue)}
+.q-input:disabled{color:var(--green);border-color:var(--green)}
+.btn-check{background:transparent;border:1px solid var(--dim);color:var(--text);padding:9px 16px;border-radius:6px;font-size:13px;cursor:pointer;transition:all .15s;white-space:nowrap}
+.btn-check:hover{border-color:var(--blue);color:var(--blue)}
+.btn-check.ok{border-color:var(--green);color:var(--green)}
+.btn-hint{background:transparent;border:1px solid var(--border);color:var(--dim);width:34px;height:34px;border-radius:6px;cursor:pointer;font-size:13px;flex-shrink:0;transition:border .2s}
+.btn-hint:hover{border-color:var(--dim);color:var(--text)}
+.q-feedback{font-size:12px;margin-top:6px}
+.q-feedback.ok{color:var(--green)}
+.q-feedback.err{color:var(--red)}
+.hint-text{font-size:12px;color:var(--dim);margin-top:5px;font-style:italic;display:none}
+
+/* ── Env panel header ── */
+.env-header{background:#0d0e1a;padding:8px 14px;font-size:12px;color:var(--dim);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0}
+.env-dot{width:8px;height:8px;border-radius:50%;background:var(--red);box-shadow:0 0 6px var(--red)}
+.env-content{flex:1;overflow:hidden;position:relative}
+
+/* ═══════════════════════════════
+   ENV 1 — Career flip cards
+═══════════════════════════════ */
+.careers{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;background:radial-gradient(ellipse at 50% 0%,#1a2240 0%,var(--bg) 70%)}
+.careers-title{font-size:13px;color:var(--dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
+.flip-grid{display:flex;gap:12px;width:100%}
+.flip-card{flex:1;height:170px;cursor:pointer;perspective:800px}
+.flip-inner{width:100%;height:100%;position:relative;transform-style:preserve-3d;transition:transform .5s cubic-bezier(.4,0,.2,1)}
+.flip-card:hover .flip-inner,.flip-card.flipped .flip-inner{transform:rotateY(180deg)}
+.flip-front,.flip-back{position:absolute;width:100%;height:100%;backface-visibility:hidden;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:16px;text-align:center;border:1px solid var(--border)}
+.flip-back{transform:rotateY(180deg);justify-content:flex-start;padding-top:20px}
+.flip-icon{font-size:36px}
+.flip-title{font-size:13px;font-weight:700;color:var(--white)}
+.flip-back-text{font-size:12px;color:var(--text);line-height:1.6;text-align:left}
+.flip-back-tag{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:3px 8px;border-radius:4px;margin-bottom:6px;align-self:flex-start}
+.card-pentest .flip-front{background:linear-gradient(135deg,#1a2a1a,#0f1a0f)}
+.card-pentest .flip-back{background:linear-gradient(135deg,#1a2a1a,#0f1a0f)}
+.card-pentest .flip-icon-bg{color:#3ddc84}
+.card-red    .flip-front{background:linear-gradient(135deg,#2a1a1a,#1a0f0f)}
+.card-red    .flip-back{background:linear-gradient(135deg,#2a1a1a,#1a0f0f)}
+.card-web    .flip-front{background:linear-gradient(135deg,#1a1a2a,#0f0f1a)}
+.card-web    .flip-back{background:linear-gradient(135deg,#1a1a2a,#0f0f1a)}
+.hover-hint{font-size:11px;color:var(--dim);margin-top:8px;display:flex;align-items:center;gap:4px}
+
+/* ═══════════════════════════════
+   ENV 2 — OSINT Board
+═══════════════════════════════ */
+.osint-board{height:100%;background:radial-gradient(ellipse at center,#1a1b30 0%,#0d0e1a 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:14px}
+.osint-title{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--dim);display:flex;align-items:center;gap:8px}
+.radar-dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse-dot 1.5s infinite}
+@keyframes pulse-dot{0%,100%{box-shadow:0 0 0 0 rgba(61,220,132,.6)}50%{box-shadow:0 0 0 6px rgba(61,220,132,0)}}
+.intel-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%}
+.intel-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;cursor:pointer;transition:transform .2s,border-color .2s;height:110px;position:relative}
+.intel-card:hover{transform:translateY(-2px);border-color:var(--blue)}
+.intel-card.revealed{cursor:default}
+.intel-card.revealed:hover{transform:none}
+.intel-card.key-find{border-color:var(--yellow) !important;box-shadow:0 0 16px rgba(245,197,66,.25)}
+
+.ic-locked{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:var(--surface);transition:opacity .3s}
+.ic-locked .lock-icon{font-size:24px;opacity:.5}
+.ic-locked .lock-label{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
+.ic-locked .click-hint{font-size:10px;color:var(--dim);opacity:.6}
+
+.ic-content{position:absolute;inset:0;padding:12px;opacity:0;transition:opacity .3s;pointer-events:none}
+.ic-content.show{opacity:1}
+.ic-type{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.ic-data{font-size:12px;color:var(--text);line-height:1.7;font-family:'Courier New',monospace}
+.ic-key-val{display:flex;gap:6px}
+.ic-key{color:#7ec8e3;white-space:nowrap}
+.ic-val{color:var(--white)}
+.ic-val.highlight{color:var(--yellow);font-weight:700}
+
+.reveal-progress{display:flex;gap:6px;margin-top:4px}
+.rp-dot{width:8px;height:8px;border-radius:50%;background:var(--border);transition:background .3s}
+.rp-dot.lit{background:var(--green)}
+
+/* Reveal animation */
+@keyframes card-reveal{0%{transform:scale(.95);opacity:0}100%{transform:scale(1);opacity:1}}
+.ic-content.show{animation:card-reveal .3s ease}
+
+/* ═══════════════════════════════
+   ENV 3 — Terminal
+═══════════════════════════════ */
+.terminal-wrap{height:100%;display:flex;flex-direction:column;background:#0a0a0a}
+.terminal-bar{background:#1a1a1a;padding:7px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #222;flex-shrink:0}
+.t-dot{width:10px;height:10px;border-radius:50%}
+.terminal-replay{margin-left:auto;background:transparent;border:1px solid #333;color:#666;padding:4px 12px;border-radius:4px;font-size:11px;cursor:pointer;transition:all .15s}
+.terminal-replay:hover{border-color:#4a90e2;color:#4a90e2}
+.terminal-body{flex:1;overflow-y:auto;padding:14px 16px;font-family:'Courier New',monospace;font-size:12px;line-height:1.8;color:#33ff33}
+.t-line{display:block;white-space:pre-wrap;word-break:break-all}
+.t-line.hidden{display:none}
+.t-prompt{color:#4fc3f7}
+.t-cmd{color:#fff}
+.t-comment{color:#444}
+.t-hi{color:#ffeb3b;font-weight:bold}
+.t-warn{color:#ff9800}
+.t-dim{color:#555}
+.t-cursor{display:inline-block;width:8px;height:14px;background:#33ff33;vertical-align:middle;animation:blink .7s step-end infinite;margin-left:2px}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+
+/* ═══════════════════════════════
+   ENV 4 — Login portal
+═══════════════════════════════ */
+.portal-wrap{height:100%;background:linear-gradient(135deg,#0d2235,#0a1520);display:flex;flex-direction:column}
+.portal-bar{background:rgba(0,0,0,.5);padding:5px 12px;display:flex;justify-content:space-between;font-size:11px;color:#888;flex-shrink:0}
+.browser-win{margin:12px;flex:1;background:#fff;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,.6);display:flex;flex-direction:column;overflow:hidden}
+.brow-chrome{background:#2e2e2e;padding:7px 12px;display:flex;align-items:center;gap:8px;flex-shrink:0}
+.brow-dots{display:flex;gap:5px}
+.brow-dot{width:10px;height:10px;border-radius:50%}
+.brow-dot:nth-child(1){background:#ff5f56}
+.brow-dot:nth-child(2){background:#ffbd2e}
+.brow-dot:nth-child(3){background:#27c93f}
+.brow-addr{flex:1;background:#1a1a1a;border-radius:4px;padding:4px 10px;font-size:11px;color:#ccc;font-family:monospace}
+.brow-body{flex:1;overflow-y:auto;font-family:sans-serif}
+.fb-nav{background:#2e7d32;color:#fff;padding:11px 18px;display:flex;align-items:center;justify-content:space-between}
+.fb-logo{font-size:16px;font-weight:700;display:flex;align-items:center;gap:7px}
+.fb-sub{font-size:10px;color:#a5d6a7;text-align:right}
+.login-wrap{display:flex;align-items:center;justify-content:center;padding:24px;background:#f5f5f5;min-height:100%}
+.login-box{background:#fff;border-radius:10px;padding:28px;width:100%;max-width:320px;box-shadow:0 4px 24px rgba(0,0,0,.12)}
+.login-box h2{font-size:16px;color:#2e7d32;margin-bottom:4px}
+.login-box .login-sub{font-size:11px;color:#999;margin-bottom:20px}
+.l-field{margin-bottom:12px}
+.l-field label{display:block;font-size:11px;color:#666;margin-bottom:3px}
+.l-field input{width:100%;border:1.5px solid #ddd;border-radius:6px;padding:8px 10px;font-size:13px;color:#333;outline:none;transition:border .2s}
+.l-field input:focus{border-color:#2e7d32}
+.l-btn{width:100%;background:#2e7d32;color:#fff;border:none;padding:10px;border-radius:6px;font-size:13px;cursor:pointer;margin-top:6px;transition:background .2s}
+.l-btn:hover{background:#1b5e20}
+.l-error{background:#ffebee;border:1px solid #ffcdd2;color:#c62828;padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:10px;display:none}
+.l-success{display:none;text-align:center;animation:fadeInUp .4s ease}
+@keyframes fadeInUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.l-success .granted{font-size:15px;font-weight:700;color:#2e7d32;margin-bottom:8px}
+.l-success .flag{font-family:monospace;background:#e8f5e9;border:1px solid #c8e6c9;color:#1b5e20;padding:10px;border-radius:6px;font-size:13px;font-weight:700;margin:10px 0;text-align:center}
+.l-success .access-info{font-size:11px;color:#888;line-height:1.6}
+@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+.shake{animation:shake .35s ease}
+
+/* ═══════════════════════════════
+   ENV 5 — Report
+═══════════════════════════════ */
+.report-wrap{height:100%;overflow-y:auto;background:#f8f9fc;font-family:sans-serif;padding:20px}
+.report-brand{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding-bottom:12px;border-bottom:3px solid #e05252}
+.report-brand h2{font-size:16px;color:#1a1b2c;font-weight:800}
+.report-brand p{font-size:11px;color:#888;margin-top:2px}
+.report-meta{display:flex;gap:8px;align-items:center}
+.report-status{background:#ffebee;color:#c62828;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700}
+
+.finding{border:1px solid #e0e0e0;border-radius:10px;overflow:hidden;margin-bottom:16px;background:#fff}
+.finding-head{background:#fafafa;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #eee}
+.finding-name{font-size:13px;font-weight:700;color:#222}
+.sev{padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700}
+.sev-high{background:#ffebee;color:#c62828}
+.finding-field{padding:10px 16px;border-bottom:1px solid #f5f5f5}
+.finding-field:last-child{border-bottom:none}
+.finding-field label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#aaa;display:block;margin-bottom:4px}
+.finding-field p{font-size:12px;color:#444;line-height:1.6}
+.finding-field code{background:#f0f0f0;padding:1px 5px;border-radius:3px;font-size:11px}
+
+.next-up{background:#1a1b2c;border-radius:10px;padding:16px;color:#fff}
+.next-up h3{font-size:13px;font-weight:700;margin-bottom:10px;color:#eee}
+.path-cards{display:grid;grid-template-columns:1fr;gap:8px}
+.path-card{background:#21223a;border:1px solid #2e2f4a;border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:10px}
+.path-card-icon{font-size:20px;flex-shrink:0}
+.path-card-name{font-size:13px;font-weight:700;color:#eee}
+.path-card-sub{font-size:11px;color:#666;margin-top:2px}
+
+/* ── Completion burst ── */
+@keyframes burst{0%{transform:scale(1)}30%{transform:scale(1.3)}60%{transform:scale(.9)}100%{transform:scale(1)}}
+.task-dot.burst{animation:burst .4s ease}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:#333;border-radius:3px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span>Room progress</span>
+  <div class="pbar"><div class="pfill" id="pfill" style="width:0%"></div></div>
+  <span id="plabel" style="min-width:28px;text-align:right">0%</span>
+</div>
+
+<div class="main">
+
+<!-- ═══════════════════════════════════════
+     LEFT — Tasks
+═══════════════════════════════════════ -->
+<div class="task-panel">
+
+  <!-- TASK 1 -->
+  <div class="task active" id="task-1">
+    <div class="task-header" onclick="openTask(1)">
+      <div class="task-left">
+        <span class="task-num">Task 1</span>
+        <div class="task-dot" id="dot-1"></div>
+        <span class="task-title">Think Like a Hacker</span>
+      </div>
+      <span class="chevron open" id="chev-1">▼</span>
+    </div>
+    <div class="task-body open" id="body-1">
+      <p class="hook">Offensive security means finding flaws before attackers do — legally, and with permission.</p>
+      <p class="sub">Three paths, one mindset. Hover the cards on the right to explore each one.</p>
+
+      <!-- Phase flow diagram -->
+      <div class="diagram">
+        <div class="phase-node">
+          <div class="phase-circle" style="background:#1a2e1a;border-color:#3ddc84;color:#3ddc84">🔍</div>
+          <div class="phase-label" style="color:#3ddc84">Recon</div>
+          <div class="phase-sub">Task 2</div>
+        </div>
+        <div class="phase-arrow">→</div>
+        <div class="phase-node">
+          <div class="phase-circle" style="background:#1a1a2e;border-color:#4a90e2;color:#4a90e2">📡</div>
+          <div class="phase-label" style="color:#4a90e2">Scan</div>
+          <div class="phase-sub">Task 3</div>
+        </div>
+        <div class="phase-arrow">→</div>
+        <div class="phase-node">
+          <div class="phase-circle" style="background:#2e1a1a;border-color:#e05252;color:#e05252">💥</div>
+          <div class="phase-label" style="color:#e05252">Exploit</div>
+          <div class="phase-sub">Task 4</div>
+        </div>
+        <div class="phase-arrow">→</div>
+        <div class="phase-node">
+          <div class="phase-circle" style="background:#2e2a1a;border-color:#f5c542;color:#f5c542">📋</div>
+          <div class="phase-label" style="color:#f5c542">Report</div>
+          <div class="phase-sub">Task 5</div>
+        </div>
+      </div>
+
+      <div class="q-section">
+        <div class="q-label">Answer the question below</div>
+        <div class="q-text">What do we call an authorised, scoped simulation of a real-world attack?</div>
+        <div class="q-row">
+          <input class="q-input" id="q1" type="text" placeholder="Your answer...">
+          <button class="btn-check" onclick="check('q1','penetration test',1)">Check</button>
+          <button class="btn-hint" onclick="hint('h1')" title="Hint">?</button>
+        </div>
+        <div class="hint-text" id="h1">Look at the first card on the right — it names this type of engagement.</div>
+        <div class="q-feedback" id="f1"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TASK 2 -->
+  <div class="task" id="task-2">
+    <div class="task-header" onclick="openTask(2)">
+      <div class="task-left">
+        <span class="task-num">Task 2</span>
+        <div class="task-dot" id="dot-2"></div>
+        <span class="task-title">Reconnaissance</span>
+      </div>
+      <span class="chevron" id="chev-2">▼</span>
+    </div>
+    <div class="task-body" id="body-2">
+      <p class="hook">Before we touch their systems, we gather everything that's already public.</p>
+
+      <div class="compare">
+        <div class="compare-card" style="border-color:#3ddc84">
+          <h4 style="color:#3ddc84">🕵️ Passive</h4>
+          <ul>
+            <li>No target contact</li>
+            <li>WHOIS records</li>
+            <li>LinkedIn profiles</li>
+            <li>Shodan / Censys</li>
+            <li>Leaves zero traces</li>
+          </ul>
+        </div>
+        <div class="compare-card" style="border-color:#e05252">
+          <h4 style="color:#e05252">📡 Active</h4>
+          <ul>
+            <li>Direct probing</li>
+            <li>Port scanning</li>
+            <li>Dir enumeration</li>
+            <li>Banner grabbing</li>
+            <li>Leaves log traces</li>
+          </ul>
+        </div>
+      </div>
+
+      <p class="sub" style="margin-top:6px">Click each intel card on the right to reveal what we found on FakeBank.</p>
+
+      <div class="q-section">
+        <div class="q-label">Answer the question below</div>
+        <div class="q-text">Who is FakeBank's IT Administrator? (revealed in the OSINT board)</div>
+        <div class="q-row">
+          <input class="q-input" id="q2" type="text" placeholder="First and last name">
+          <button class="btn-check" onclick="check('q2','sarah chen',2)">Check</button>
+          <button class="btn-hint" onclick="hint('h2')" title="Hint">?</button>
+        </div>
+        <div class="hint-text" id="h2">Reveal the LinkedIn card on the right.</div>
+        <div class="q-feedback" id="f2"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TASK 3 -->
+  <div class="task" id="task-3">
+    <div class="task-header" onclick="openTask(3)">
+      <div class="task-left">
+        <span class="task-num">Task 3</span>
+        <div class="task-dot" id="dot-3"></div>
+        <span class="task-title">Scanning & Enumeration</span>
+      </div>
+      <span class="chevron" id="chev-3">▼</span>
+    </div>
+    <div class="task-body" id="body-3">
+      <p class="hook">Now we probe directly — mapping every open port and hidden page on FakeBank's servers.</p>
+
+      <div class="tool-cards">
+        <div class="tool-card" style="border-color:#4a90e2">
+          <div class="tool-icon">🔭</div>
+          <h4>Nmap</h4>
+          <p>Scans for open ports and running services</p>
+          <div class="tool-badge" style="background:#1a1a2e;color:#4a90e2">nmap -sV -p-</div>
+        </div>
+        <div class="tool-card" style="border-color:#3ddc84">
+          <div class="tool-icon">🗂️</div>
+          <h4>Gobuster</h4>
+          <p>Discovers hidden directories and files</p>
+          <div class="tool-badge" style="background:#1a2e1a;color:#3ddc84">gobuster dir</div>
+        </div>
+      </div>
+
+      <p class="sub">Hit <strong>▶ Run Scan</strong> in the terminal to watch it go.</p>
+
+      <div class="q-section">
+        <div class="q-label">Answer the question below</div>
+        <div class="q-text">What hidden directory did Gobuster uncover?</div>
+        <div class="q-row">
+          <input class="q-input" id="q3" type="text" placeholder="/...">
+          <button class="btn-check" onclick="check('q3','/admin-portal',3)">Check</button>
+          <button class="btn-hint" onclick="hint('h3')" title="Hint">?</button>
+        </div>
+        <div class="hint-text" id="h3">Watch for the highlighted line in the Gobuster output.</div>
+        <div class="q-feedback" id="f3"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TASK 4 -->
+  <div class="task" id="task-4">
+    <div class="task-header" onclick="openTask(4)">
+      <div class="task-left">
+        <span class="task-num">Task 4</span>
+        <div class="task-dot" id="dot-4"></div>
+        <span class="task-title">Exploitation</span>
+      </div>
+      <span class="chevron" id="chev-4">▼</span>
+    </div>
+    <div class="task-body" id="body-4">
+      <p class="hook">The hidden portal has a login. Our recon already gave us everything we need.</p>
+
+      <div class="owasp-card">
+        <div class="owasp-icon">🔓</div>
+        <div>
+          <div class="owasp-title">OWASP A07:2021 — Authentication Failures</div>
+          <div class="owasp-desc">Weak passwords, default credentials, and broken login flows. One of the most common and impactful vulnerability classes.</div>
+        </div>
+      </div>
+
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font-size:13px;font-family:monospace;line-height:2">
+        <span style="color:#7ec8e3">username:</span> <span style="color:var(--yellow)">schen</span><br>
+        <span style="color:#7ec8e3">password:</span> <span style="color:var(--yellow)">admin123</span>
+      </div>
+
+      <div class="q-section">
+        <div class="q-label">Answer the question below</div>
+        <div class="q-text">Enter the credentials above on the right. What flag is shown after login?</div>
+        <div class="q-row">
+          <input class="q-input" id="q4" type="text" placeholder="THM{...}">
+          <button class="btn-check" onclick="check('q4','thm{4uth_byp4ss_w1ns}',4)">Check</button>
+          <button class="btn-hint" onclick="hint('h4')" title="Hint">?</button>
+        </div>
+        <div class="hint-text" id="h4">Log in on the right with the credentials shown above.</div>
+        <div class="q-feedback" id="f4"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TASK 5 -->
+  <div class="task" id="task-5">
+    <div class="task-header" onclick="openTask(5)">
+      <div class="task-left">
+        <span class="task-num">Task 5</span>
+        <div class="task-dot" id="dot-5"></div>
+        <span class="task-title">Reporting</span>
+      </div>
+      <span class="chevron" id="chev-5">▼</span>
+    </div>
+    <div class="task-body" id="body-5">
+      <p class="hook">Finding a vulnerability means nothing if it's never communicated. The report is the deliverable.</p>
+
+      <!-- Report anatomy diagram -->
+      <div class="report-anatomy">
+        <div class="ra-step">
+          <div class="ra-icon" style="background:#2e1a2e">📛</div>
+          <div class="ra-label">Name</div>
+        </div>
+        <div class="ra-arrow">→</div>
+        <div class="ra-step">
+          <div class="ra-icon" style="background:#2e1a1a">⚡</div>
+          <div class="ra-label">Severity</div>
+        </div>
+        <div class="ra-arrow">→</div>
+        <div class="ra-step">
+          <div class="ra-icon" style="background:#1a1a2e">🔍</div>
+          <div class="ra-label">Evidence</div>
+        </div>
+        <div class="ra-arrow">→</div>
+        <div class="ra-step">
+          <div class="ra-icon" style="background:#2e2a1a">💣</div>
+          <div class="ra-label">Impact</div>
+        </div>
+        <div class="ra-arrow">→</div>
+        <div class="ra-step">
+          <div class="ra-icon" style="background:#1a2e1a">🔧</div>
+          <div class="ra-label">Fix</div>
+        </div>
+      </div>
+
+      <p class="sub">Review the completed finding report on the right.</p>
+
+      <div class="q-section">
+        <div class="q-label">Answer the question below</div>
+        <div class="q-text">What OWASP category is referenced in the finding report?</div>
+        <div class="q-row">
+          <input class="q-input" id="q5" type="text" placeholder="A0X:2021">
+          <button class="btn-check" onclick="check('q5','a07:2021',5)">Check</button>
+          <button class="btn-hint" onclick="hint('h5')" title="Hint">?</button>
+        </div>
+        <div class="hint-text" id="h5">Check the Vulnerability field in the finding on the right.</div>
+        <div class="q-feedback" id="f5"></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /task-panel -->
+
+<!-- ═══════════════════════════════════════
+     RIGHT — Environments
+═══════════════════════════════════════ -->
+<div class="env-panel">
+  <div class="env-header">
+    <div class="env-dot"></div>
+    <span id="env-label">FakeBank Engagement</span>
+  </div>
+  <div class="env-content">
+
+    <!-- ENV 1: Career flip cards -->
+    <div id="env-1" class="careers">
+      <div class="careers-title">Three paths into offensive security</div>
+      <div class="flip-grid">
+
+        <div class="flip-card card-pentest" onclick="this.classList.toggle('flipped')">
+          <div class="flip-inner">
+            <div class="flip-front">
+              <div class="flip-icon">🎯</div>
+              <div class="flip-title" style="color:#3ddc84">Penetration Testing</div>
+              <div style="font-size:10px;color:#666;margin-top:4px">tap to learn more</div>
+            </div>
+            <div class="flip-back">
+              <div class="flip-back-tag" style="background:#1a3a1a;color:#3ddc84">Authorised Attack</div>
+              <div class="flip-back-text">Hired to simulate a real attacker. Scoped, time-limited, ends with a written report of findings and fixes.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flip-card card-red" onclick="this.classList.toggle('flipped')">
+          <div class="flip-inner">
+            <div class="flip-front">
+              <div class="flip-icon">🪖</div>
+              <div class="flip-title" style="color:#e05252">Red Teaming</div>
+              <div style="font-size:10px;color:#666;margin-top:4px">tap to learn more</div>
+            </div>
+            <div class="flip-back">
+              <div class="flip-back-tag" style="background:#3a1a1a;color:#e05252">Full Simulation</div>
+              <div class="flip-back-text">Longer-form adversarial exercise testing people, processes, and technology — not just technical vulnerabilities.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flip-card card-web" onclick="this.classList.toggle('flipped')">
+          <div class="flip-inner">
+            <div class="flip-front">
+              <div class="flip-icon">🌐</div>
+              <div class="flip-title" style="color:#4a90e2">Web App Security</div>
+              <div style="font-size:10px;color:#666;margin-top:4px">tap to learn more</div>
+            </div>
+            <div class="flip-back">
+              <div class="flip-back-tag" style="background:#1a1a3a;color:#4a90e2">OWASP Focus</div>
+              <div class="flip-back-text">Specialised in web vulnerabilities: auth failures, injection flaws, broken access controls, and more.</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <div class="hover-hint">↑ tap any card to flip it</div>
+    </div>
+
+    <!-- ENV 2: OSINT board -->
+    <div id="env-2" style="display:none" class="osint-board">
+      <div class="osint-title">
+        <div class="radar-dot"></div>
+        passive intel gathering — fakebank.thm
+      </div>
+      <div class="intel-grid">
+
+        <div class="intel-card" id="ic-whois" onclick="revealCard('ic-whois',0)">
+          <div class="ic-locked" id="ic-whois-lock">
+            <div class="lock-icon">🔒</div>
+            <div class="lock-label">WHOIS</div>
+            <div class="click-hint">click to reveal</div>
+          </div>
+          <div class="ic-content" id="ic-whois-data">
+            <div class="ic-type" style="color:#4a90e2">🔎 WHOIS Record</div>
+            <div class="ic-data">
+              <div class="ic-key-val"><span class="ic-key">Registrant:</span><span class="ic-val">John Harris</span></div>
+              <div class="ic-key-val"><span class="ic-key">Email:</span><span class="ic-val">j.harris@fakebank.thm</span></div>
+              <div class="ic-key-val"><span class="ic-key">Registered:</span><span class="ic-val">2019-03-14</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="intel-card" id="ic-linkedin" onclick="revealCard('ic-linkedin',1)">
+          <div class="ic-locked" id="ic-linkedin-lock">
+            <div class="lock-icon">🔒</div>
+            <div class="lock-label">LINKEDIN</div>
+            <div class="click-hint">click to reveal</div>
+          </div>
+          <div class="ic-content" id="ic-linkedin-data">
+            <div class="ic-type" style="color:#f5c542">👤 LinkedIn</div>
+            <div class="ic-data">
+              <div class="ic-key-val"><span class="ic-key">CEO:</span><span class="ic-val">John Harris</span></div>
+              <div class="ic-key-val"><span class="ic-key">IT Admin:</span><span class="ic-val highlight">Sarah Chen</span></div>
+              <div class="ic-key-val"><span class="ic-key">Dev:</span><span class="ic-val">Priya Nair (PHP)</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="intel-card" id="ic-shodan" onclick="revealCard('ic-shodan',2)">
+          <div class="ic-locked" id="ic-shodan-lock">
+            <div class="lock-icon">🔒</div>
+            <div class="lock-label">SHODAN</div>
+            <div class="click-hint">click to reveal</div>
+          </div>
+          <div class="ic-content" id="ic-shodan-data">
+            <div class="ic-type" style="color:#3ddc84">🌐 Shodan</div>
+            <div class="ic-data">
+              <div class="ic-key-val"><span class="ic-key">Port 80:</span><span class="ic-val">Apache 2.4.51</span></div>
+              <div class="ic-key-val"><span class="ic-key">Port 22:</span><span class="ic-val">OpenSSH 8.2p1</span></div>
+              <div class="ic-key-val"><span class="ic-key">Port 3306:</span><span class="ic-val">MySQL (filtered)</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="intel-card" id="ic-notes" onclick="revealCard('ic-notes',3)">
+          <div class="ic-locked" id="ic-notes-lock">
+            <div class="lock-icon">🔒</div>
+            <div class="lock-label">NOTES</div>
+            <div class="click-hint">click to reveal</div>
+          </div>
+          <div class="ic-content" id="ic-notes-data">
+            <div class="ic-type" style="color:#e05252">⚠ Analyst Notes</div>
+            <div class="ic-data" style="color:#e09050">
+              Username pattern:<br>
+              first initial + surname<br>
+              → <strong style="color:#f5c542">schen</strong> likely username<br>
+              PHP+MySQL: check defaults
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <div class="reveal-progress">
+        <div class="rp-dot" id="rp-0"></div>
+        <div class="rp-dot" id="rp-1"></div>
+        <div class="rp-dot" id="rp-2"></div>
+        <div class="rp-dot" id="rp-3"></div>
+        <span style="font-size:10px;color:var(--dim);margin-left:4px" id="rp-label">0 / 4 revealed</span>
+      </div>
+    </div>
+
+    <!-- ENV 3: Terminal -->
+    <div id="env-3" style="display:none" class="terminal-wrap">
+      <div class="terminal-bar">
+        <div class="t-dot" style="background:#ff5f56"></div>
+        <div class="t-dot" style="background:#ffbd2e"></div>
+        <div class="t-dot" style="background:#27c93f"></div>
+        <span style="font-size:11px;color:#555;margin-left:8px;font-family:monospace">attacker@kali: ~</span>
+        <button class="terminal-replay" id="t-replay" onclick="runTerminal()">▶ Run Scan</button>
+      </div>
+      <div class="terminal-body" id="terminal-body">
+        <span class="t-cursor"></span>
+      </div>
+    </div>
+
+    <!-- ENV 4: Login portal -->
+    <div id="env-4" style="display:none" class="portal-wrap">
+      <div class="portal-bar"><span>Desktop</span><span>03:07 PM</span></div>
+      <div class="browser-win">
+        <div class="brow-chrome">
+          <div class="brow-dots">
+            <div class="brow-dot"></div><div class="brow-dot"></div><div class="brow-dot"></div>
+          </div>
+          <div class="brow-addr">http://fakebank.thm/admin-portal</div>
+        </div>
+        <div class="brow-body">
+          <div class="fb-nav">
+            <div class="fb-logo">🐴 FAKE BANK</div>
+            <div class="fb-sub">Admin Portal<br>Authorised Access Only</div>
+          </div>
+          <div class="login-wrap">
+            <div class="login-box" id="login-box">
+              <h2>Staff Login</h2>
+              <p class="login-sub">FakeBank Internal Management System</p>
+              <div class="l-error" id="l-err">Incorrect username or password.</div>
+              <div class="l-success" id="l-ok">
+                <div class="granted">✅ ACCESS GRANTED</div>
+                <div style="font-size:12px;color:#555;margin-bottom:8px">Welcome, Sarah Chen (IT Administrator)</div>
+                <div class="flag">thm{4uth_byp4ss_w1ns}</div>
+                <div class="access-info">You now have access to:<br>Customer records · Internal configs · Transaction logs</div>
+              </div>
+              <div id="l-form">
+                <div class="l-field"><label>Username</label><input type="text" id="l-user" autocomplete="off" placeholder="username"></div>
+                <div class="l-field"><label>Password</label><input type="password" id="l-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')tryLogin()"></div>
+                <button class="l-btn" onclick="tryLogin()">Sign In →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ENV 5: Report -->
+    <div id="env-5" style="display:none" class="report-wrap">
+      <div class="report-brand">
+        <div>
+          <h2>Penetration Test Report</h2>
+          <p>FakeBank Ltd. · April 2026 · External web presence & internal portal</p>
+        </div>
+        <div class="report-meta">
+          <div class="report-status">DRAFT</div>
+        </div>
+      </div>
+
+      <div class="finding">
+        <div class="finding-head">
+          <div class="finding-name">FINDING #1 — Default Admin Credentials</div>
+          <div class="sev sev-high">HIGH</div>
+        </div>
+        <div class="finding-field">
+          <label>Vulnerability</label>
+          <p>Authentication Failure — Default Credentials (OWASP A07:2021)</p>
+        </div>
+        <div class="finding-field">
+          <label>Evidence</label>
+          <p>Admin portal at <code>/admin-portal</code> discovered via Gobuster. Default credential pair <code>schen / admin123</code> accepted — granting full access to customer records, internal configs, and transaction history.</p>
+        </div>
+        <div class="finding-field">
+          <label>Business Impact</label>
+          <p>Unauthenticated attacker gains full admin access to all customer financial data. Potential regulatory breach and reputational damage.</p>
+        </div>
+        <div class="finding-field">
+          <label>Remediation</label>
+          <p>Enforce a strong password policy. Rotate all default credentials immediately. Implement MFA on the admin portal. Restrict access to internal IP ranges only.</p>
+        </div>
+      </div>
+
+      <div class="next-up">
+        <h3>🚀 Where to go next</h3>
+        <div class="path-cards">
+          <div class="path-card">
+            <div class="path-card-icon">🎯</div>
+            <div>
+              <div class="path-card-name">Jr Penetration Tester</div>
+              <div class="path-card-sub">Structured, hands-on pen testing training</div>
+            </div>
+          </div>
+          <div class="path-card">
+            <div class="path-card-icon">🪖</div>
+            <div>
+              <div class="path-card-name">Red Teaming Path</div>
+              <div class="path-card-sub">Adversarial simulation beyond technical vulns</div>
+            </div>
+          </div>
+          <div class="path-card">
+            <div class="path-card-icon">🌐</div>
+            <div>
+              <div class="path-card-name">Web Fundamentals</div>
+              <div class="path-card-sub">Deepen your understanding of web app security</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /env-content -->
+</div><!-- /env-panel -->
+</div><!-- /main -->
+
+<script>
+const labels = {1:'FakeBank Engagement',2:'OSINT Intel Board',3:'Terminal — Active Scan',4:'FakeBank Admin Portal',5:'Pentest Report'};
+const correct = {'q1':'penetration test','q2':'sarah chen','q3':'/admin-portal','q4':'thm{4uth_byp4ss_w1ns}','q5':'a07:2021'};
+const done = {};
+
+function openTask(n){
+  for(let i=1;i<=5;i++){
+    document.getElementById('body-'+i).classList.remove('open');
+    document.getElementById('chev-'+i).classList.remove('open');
+    document.getElementById('task-'+i).classList.remove('active');
+    document.getElementById('env-'+i).style.display='none';
+  }
+  document.getElementById('body-'+n).classList.add('open');
+  document.getElementById('chev-'+n).classList.add('open');
+  document.getElementById('task-'+n).classList.add('active');
+  document.getElementById('env-'+n).style.display='';
+  document.getElementById('env-label').textContent=labels[n];
+  if(n===3) setTimeout(runTerminal,400);
+}
+
+function check(qId, ans, taskNum){
+  const inp = document.getElementById(qId);
+  const fb  = document.getElementById('f'+qId.slice(1));
+  const btn = inp.closest('.q-row').querySelector('.btn-check');
+  if(inp.value.trim().toLowerCase()===ans.toLowerCase()){
+    fb.textContent='✓ Correct!'; fb.className='q-feedback ok';
+    btn.textContent='✓'; btn.classList.add('ok');
+    inp.disabled=true;
+    if(!done[taskNum]){
+      done[taskNum]=true;
+      const dot=document.getElementById('dot-'+taskNum);
+      dot.classList.add('done','burst');
+      updateProgress();
+    }
+  } else {
+    fb.textContent='✗ Try again.'; fb.className='q-feedback err';
+    inp.style.borderColor='var(--red)';
+    setTimeout(()=>inp.style.borderColor='',1000);
+  }
+}
+
+function hint(id){
+  const el=document.getElementById(id);
+  el.style.display=el.style.display==='block'?'none':'block';
+}
+
+function updateProgress(){
+  const n=Object.keys(done).length;
+  const pct=Math.round(n/5*100);
+  document.getElementById('pfill').style.width=pct+'%';
+  document.getElementById('plabel').textContent=pct+'%';
+}
+
+/* ── OSINT card reveal ── */
+let revealed=0;
+function revealCard(cardId, idx){
+  const lock=document.getElementById(cardId+'-lock');
+  const data=document.getElementById(cardId+'-data');
+  if(data.classList.contains('show')) return;
+  lock.style.opacity='0'; lock.style.pointerEvents='none';
+  data.classList.add('show');
+  if(idx===1) document.getElementById(cardId).classList.add('key-find');
+  document.getElementById('rp-'+idx).classList.add('lit');
+  revealed++;
+  document.getElementById('rp-label').textContent=revealed+' / 4 revealed';
+}
+
+/* ── Terminal animation ── */
+const termLines = [
+  {t:'# Active scanning — FakeBank engagement',cls:'t-comment',d:0},
+  {t:'',d:120},
+  {t:'attacker@kali:~$ ',cls:'t-prompt',d:280,inline:true},
+  {t:'nmap -sV -p- 10.10.73.122',cls:'t-cmd',d:280,append:true},
+  {t:'',d:900},
+  {t:'Starting Nmap 7.94  ( https://nmap.org )',d:920},
+  {t:'Host is up (0.043s latency).',d:1050},
+  {t:'',d:1160},
+  {t:'PORT     STATE  SERVICE    VERSION',cls:'t-dim',d:1200},
+  {t:'22/tcp   open   ssh        OpenSSH 8.2p1',d:1350},
+  {t:'80/tcp   open   http       Apache httpd 2.4.51',cls:'t-hi',d:1500},
+  {t:'3306/tcp open   mysql      MySQL 5.7.36',d:1650},
+  {t:'',d:1800},
+  {t:'Nmap done: 1 IP scanned in 14.32 seconds',d:1850},
+  {t:'',d:2000},
+  {t:'# Port 80 confirmed. Enumerating directories…',cls:'t-comment',d:2100},
+  {t:'',d:2200},
+  {t:'attacker@kali:~$ ',cls:'t-prompt',d:2350,inline:true},
+  {t:'gobuster dir -u http://fakebank.thm -w common.txt',cls:'t-cmd',d:2350,append:true},
+  {t:'',d:3000},
+  {t:'/assets               (Status: 301)',cls:'t-dim',d:3100},
+  {t:'/css                  (Status: 301)',cls:'t-dim',d:3250},
+  {t:'/images               (Status: 301)',cls:'t-dim',d:3400},
+  {t:'/index.php            (Status: 200)',cls:'t-dim',d:3550},
+  {t:'/admin-portal         (Status: 200)   ← not publicly linked',cls:'t-hi',d:3700},
+  {t:'',d:3800},
+  {t:'⚠  Hidden admin portal discovered.',cls:'t-warn',d:3900},
+];
+
+let tRunning=false;
+function runTerminal(){
+  if(tRunning) return;
+  tRunning=true;
+  const body=document.getElementById('terminal-body');
+  body.innerHTML='<span class="t-cursor"></span>';
+  const cursor=body.querySelector('.t-cursor');
+  termLines.forEach(l=>{
+    setTimeout(()=>{
+      if(l.append){
+        const prev=body.lastElementChild?.previousSibling||body.lastChild;
+        const span=document.createElement('span');
+        span.className=l.cls||'';
+        span.textContent=l.t;
+        cursor.before(span);
+      } else {
+        const line=document.createElement('span');
+        line.className='t-line '+(l.cls||'');
+        line.textContent=l.t;
+        cursor.before(line);
+        cursor.before(document.createElement('br'));
+      }
+      body.scrollTop=body.scrollHeight;
+    },l.d);
+  });
+  setTimeout(()=>{
+    tRunning=false;
+    document.getElementById('t-replay').textContent='↺ Replay';
+  },4200);
+  document.getElementById('t-replay').textContent='running…';
+}
+
+/* ── Login ── */
+function tryLogin(){
+  const u=document.getElementById('l-user').value.trim();
+  const p=document.getElementById('l-pass').value.trim();
+  if(u==='schen'&&p==='admin123'){
+    document.getElementById('l-err').style.display='none';
+    document.getElementById('l-form').style.display='none';
+    document.getElementById('l-ok').style.display='block';
+  } else {
+    document.getElementById('l-err').style.display='block';
+    const box=document.getElementById('login-box');
+    box.style.animation='none';
+    box.offsetHeight; // reflow
+    box.style.animation='shake .35s ease';
+  }
+}
+</script>
+</body>
+</html>
